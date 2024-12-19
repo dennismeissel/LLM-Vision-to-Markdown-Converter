@@ -1,5 +1,7 @@
 # Pictures
 images/
+# Output
+output/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
