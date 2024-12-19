@@ -11,8 +11,17 @@ load_dotenv()
 base_url = os.getenv("LLM_BASE_URL")
 model = os.getenv("LLM_MODEL_NAME")
 api_key = os.getenv("LLM_API_KEY")
+save_to_file = os.getenv("SAVE_RESPONSE_TO_FILE", "false").lower() == "true"
+if (save_to_file):
+    output_folder = "output"
 image_folder = "images"
-user_prompt = "What is on this picture?"
+user_prompt = """
+    You are an AI specializing in image recognition and Markdown formatting. Given an image, analyze its content and represent it solely in Markdown format. Follow these guidelines:
+
+    Use proper Markdown syntax for headings, lists, tables, or any other relevant elements.
+    Describe objects, scenes, text, or details in the image clearly and concisely.
+    Do not include any explanation, notes, or content outside Markdown.
+"""
 
 class CustomLLM(LLM, BaseModel):
     invoke_url: str
@@ -34,7 +43,7 @@ class CustomLLM(LLM, BaseModel):
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
             "top_p": self.top_p,
-            "stream": False
+            # "stream": True
         }
         response = requests.post(self.invoke_url, headers=headers, json=payload)
         response.raise_for_status()
@@ -55,7 +64,7 @@ def main():
 
     for image_file in image_files:
         print("File:", image_file)
-        input("Press Enter to send this image to the LLM...")
+        # input("Press Enter to send this image to the LLM...")
         image_path = os.path.join(image_folder, image_file)
         if not os.path.isfile(image_path):
             print("Image not found.")
@@ -75,6 +84,12 @@ def main():
         )
         print("User Prompt:", user_prompt)
         response = custom_llm.invoke(full_prompt)
+        if (save_to_file):
+            if not os.path.exists(output_folder):
+                os.makedirs(output_folder)
+            output_file = os.path.join(output_folder, image_file)
+            with open(f"{output_file}.md", "w") as f:
+                f.write(response)
         print("Model Response:")
         print(response)
         print("-" * 50)
