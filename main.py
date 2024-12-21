@@ -12,15 +12,20 @@ base_url = os.getenv("LLM_BASE_URL")
 model = os.getenv("LLM_MODEL_NAME")
 api_key = os.getenv("LLM_API_KEY")
 save_to_file = os.getenv("SAVE_RESPONSE_TO_FILE", "false").lower() == "true"
-if (save_to_file):
-    output_folder = "output"
-image_folder = "images"
-user_prompt = """
-    You are an AI specializing in image recognition and Markdown formatting. Given an image, analyze its content and represent it solely in Markdown format. Follow these guidelines:
 
-    Use proper Markdown syntax for headings, lists, tables, or any other relevant elements.
-    Describe objects, scenes, text, or details in the image clearly and concisely.
-    Do not include any explanation, notes, or content outside Markdown.
+if save_to_file:
+    output_folder = "output"
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+image_folder = "images"
+
+user_prompt = """
+You are an AI specializing in image recognition and Markdown formatting. Given an image, analyze its content and represent it solely in Markdown format. Follow these guidelines:
+
+- Use proper Markdown syntax for headings, lists, tables, or any other relevant elements.
+- Describe objects, scenes, text, or details in the image clearly and concisely.
+- Do not include any explanation, notes, or content outside Markdown.
 """
 
 class CustomLLM(LLM, BaseModel):
@@ -43,7 +48,6 @@ class CustomLLM(LLM, BaseModel):
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
             "top_p": self.top_p,
-            # "stream": True
         }
         response = requests.post(self.invoke_url, headers=headers, json=payload)
         response.raise_for_status()
@@ -54,7 +58,7 @@ class CustomLLM(LLM, BaseModel):
 
 def main():
     if not all([base_url, model, api_key]):
-        print("Set LLM_BASE_URL, LLM_MODEL_NAME, and LLM_API_KEY in your environment.")
+        print("Error: Please set LLM_BASE_URL, LLM_MODEL_NAME, and LLM_API_KEY in your environment.")
         return
 
     image_files = [f for f in os.listdir(image_folder) if f.lower().endswith(('.jpg', '.jpeg'))]
@@ -62,18 +66,22 @@ def main():
         print("No .jpg or .jpeg files in the images folder.")
         return
 
+    # Print the number of files and mention LLM calls
+    print(f"Found {len(image_files)} image file(s) to process.")
+    print("LLM calls will be made during the process.")
+    input("Press Enter to continue or Ctrl+C to cancel...")
+
     for image_file in image_files:
-        print("File:", image_file)
-        # input("Press Enter to send this image to the LLM...")
+        print("Processing file:", image_file)
         image_path = os.path.join(image_folder, image_file)
         if not os.path.isfile(image_path):
-            print("Image not found.")
+            print(f"Image not found: {image_path}")
             continue
 
         with open(image_path, "rb") as f:
             image_b64 = base64.b64encode(f.read()).decode()
 
-        full_prompt = f'{user_prompt} <img src="data:image/jpg;base64,{image_b64}" />'
+        full_prompt = f'{user_prompt}\n\n<img src="data:image/jpg;base64,{image_b64}" />'
         custom_llm = CustomLLM(
             invoke_url=base_url,
             model_name=model,
@@ -82,14 +90,14 @@ def main():
             top_p=0.9,
             max_tokens=1024
         )
-        print("User Prompt:", user_prompt)
+
         response = custom_llm.invoke(full_prompt)
-        if (save_to_file):
-            if not os.path.exists(output_folder):
-                os.makedirs(output_folder)
-            output_file = os.path.join(output_folder, image_file)
-            with open(f"{output_file}.md", "w") as f:
+
+        if save_to_file:
+            output_file = os.path.join(output_folder, f"{image_file}.md")
+            with open(output_file, "w") as f:
                 f.write(response)
+
         print("Model Response:")
         print(response)
         print("-" * 50)
